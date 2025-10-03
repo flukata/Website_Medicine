@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MediScan • หน้าหลัก</title>
+  <meta name="description" content="หน้าแรกก่อนเข้าใช้งาน MediScan – สแกนฉลากยาและถามตอบข้อมูลยา" />
+  <meta name="theme-color" content="#0ea5e9" />
+
+  <style>
+    :root{
+      --bg:#0b1220; --card:#101828; --muted:#96a2b4; --text:#e6edf3; --brand:#0ea5e9; --ok:#10b981; --warn:#f59e0b; --err:#ef4444; --radius:16px; --shadow:0 10px 30px rgba(0,0,0,.25);
+    }
+    *{ box-sizing:border-box }
+    html, body{ height:100% }
+    body{
+      margin:0; font-family:ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans";
+      color:var(--text); background:
+        radial-gradient(1200px 1000px at 80% -10%, rgba(14,165,233,.15), transparent),
+        linear-gradient(180deg, #0B1220 0%, #0B1425 100%);
+    }
+    a{ color:var(--brand); text-decoration:none }
+    .container{ width:min(1120px, 92%); margin-inline:auto }
+
+    .skip-link{ position:absolute; left:-9999px }
+    .skip-link:focus{ left:16px; top:16px; background:#111827; padding:.5rem .75rem; border-radius:10px }
+
+    /* Nav */
+    header{ padding:1rem 0 0 }
+    .nav{ display:flex; align-items:center; justify-content:space-between; gap:1rem }
+    .logo{ display:flex; align-items:center; gap:.6rem; font-weight:800; letter-spacing:.3px }
+    .badge{ font-size:.75rem; padding:.1rem .5rem; border:1px solid rgba(255,255,255,.15); border-radius:999px; color:var(--muted) }
+    .menu{ display:flex; gap:.8rem; list-style:none; margin:0; padding:0 }
+    .menu a{ display:block; padding:.6rem .8rem; border-radius:10px }
+    .menu a:hover{ background:rgba(255,255,255,.05) }
+    .nav-toggle{ display:none }
+    @media (max-width:720px){ .menu{ display:none } .nav-toggle{ display:inline-flex; padding:.5rem .75rem; border-radius:10px; border:1px solid rgba(255,255,255,.15); background:#0f172a; color:var(--text) } }
+
+    /* Hero */
+    .hero{ padding: clamp(2rem, 7vw, 5rem) 0; text-align:center }
+    .hero h1{ font-size: clamp(1.8rem, 5vw, 3rem); margin:.2rem 0 }
+    .hero p{ color:var(--muted); margin:.3rem auto 1.2rem; max-width:720px }
+    .cta{ display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap }
+    .btn{ display:inline-flex; align-items:center; gap:.5rem; padding:.9rem 1.1rem; border-radius:12px; font-weight:800; box-shadow:var(--shadow); border:1px solid rgba(255,255,255,.1); background:#0f172a; color:var(--text) }
+    .btn.primary{ background:var(--brand); color:#06202a; border-color:transparent }
+    .btn:disabled{ opacity:.6; cursor:not-allowed }
+
+    /* Sections */
+    section{ margin: 2.2rem 0 }
+    .grid{ display:grid; gap:1rem; grid-template-columns: repeat(3, 1fr) }
+    @media (max-width:960px){ .grid{ grid-template-columns: 1fr 1fr } }
+    @media (max-width:640px){ .grid{ grid-template-columns: 1fr } }
+
+    .card{ background:linear-gradient(180deg, rgba(255,255,255,.04), rgba(255,255,255,.02)); border:1px solid rgba(255,255,255,.08); padding:1rem; border-radius:var(--radius); box-shadow:var(--shadow) }
+    .card h3{ margin:.2rem 0 .4rem }
+    .muted{ color:var(--muted) }
+
+    .how{ counter-reset: step }
+    .how .card h3:before{ counter-increment: step; content: counter(step) ". "; color:var(--brand) }
+
+    .list{ display:grid; gap:.5rem; margin:.8rem 0 0; padding:0; list-style:none }
+    .list li{ display:flex; gap:.5rem; align-items:flex-start }
+    .list li span{ font-weight:800; color:var(--ok) }
+
+    .disclaimer{ font-size:.95rem; color:#bac5d4 }
+
+    footer{ padding:2rem 0; color:var(--muted) }
+
+    /* Gate (ก่อนใช้งาน) */
+    .gate{ position:fixed; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(6,12,22,.75); backdrop-filter: blur(6px); padding: 1rem; z-index:50 }
+    .gate[hidden]{ display:none }
+    .gate-box{ width:min(720px, 92%); background:var(--card); border:1px solid rgba(255,255,255,.12); border-radius: var(--radius); box-shadow:var(--shadow); overflow:hidden }
+    .gate-head{ padding:1rem 1.1rem; border-bottom:1px solid rgba(255,255,255,.1); background:rgba(14,165,233,.08) }
+    .gate-body{ padding:1rem 1.1rem; display:grid; gap:.8rem }
+    .gate-actions{ display:flex; justify-content:flex-end; gap:.6rem; padding: .6rem 1.1rem 1.1rem }
+
+    /* Toast */
+    .toast{ position:fixed; right:18px; bottom:18px; padding:.6rem .8rem; border-radius:10px; font-weight:700; z-index:60 }
+  </style>
+</head>
+<body>
+  <a class="skip-link" href="#main">ข้ามไปยังเนื้อหา</a>
+
+  <header class="container">
+    <nav class="nav">
+      <div class="logo">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="7" stroke="#0ea5e9" stroke-width="2" fill="none"/></svg>
+        MediScan <span class="badge">beta</span>
+      </div>
+      <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="menu">เมนู</button>
+      <ul id="menu" class="menu" role="menubar">
+        <li role="none"><a role="menuitem" href="#features">จุดเด่น</a></li>
+        <li role="none"><a role="menuitem" href="#how">วิธีใช้งาน</a></li>
+        <li role="none"><a role="menuitem" href="#about">เกี่ยวกับ</a></li>
+      </ul>
+    </nav>
+
+    <section class="hero" id="hero">
+      <h1>แพลตฟอร์มช่วยอ่านและทำความเข้าใจฉลากยา</h1>
+      <p class="muted">สแกนฉลากยา (จากรูปภาพ) หรือถามคำถามเกี่ยวกับยา แล้วรับสรุปข้อมูลที่อ่านง่ายขึ้น เช่น ชื่อสามัญ ปริมาณรับประทาน ข้อควรระวัง และคำเตือนที่สำคัญ</p>
+      <div class="cta">
+        <a class="btn primary" id="btnStart">เริ่มใช้งาน</a>
+      </div>
+      <p class="disclaimer" style="margin-top: .7rem">* เครื่องมือนี้ไม่ใช่คำแนะนำทางการแพทย์ โปรดปรึกษาแพทย์/เภสัชกรก่อนใช้ยา</p>
+    </section>
+  </header>
+
+  <main id="main" class="container" tabindex="-1">
+    <section id="features">
+      <div class="grid">
+        <article class="card">
+          <h3>อ่านฉลากจากรูปภาพ</h3>
+          <p class="muted">รองรับภาษาไทยและอังกฤษ อ่านชื่อสามัญ ขนาดยา และคำเตือนจากฉลาก</p>
+        </article>
+        <article class="card">
+          <h3>ถามด้วยข้อความ</h3>
+          <p class="muted">พิมพ์คำถามเกี่ยวกับยา เช่น “รับประทานได้บ่อยแค่ไหน” แล้วดูคำตอบสรุป</p>
+        </article>
+        <article class="card">
+          <h3>สรุปผลลัพธ์เข้าใจง่าย</h3>
+          <p class="muted">นำเสนอแบบหัวข้อสำคัญ</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="how">
+      <h2>วิธีใช้งาน</h2>
+      <div class="grid how">
+        <article class="card">
+          <h3>อัปโหลดภาพฉลาก</h3>
+          <ul class="list">
+            <li><span>•</span> รองรับไฟล์ JPG/PNG</li>
+            <li><span>•</span> ถ่ายให้คมชัดและไม่เอียง</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>ประมวลผลด้วย OCR + ตรวจสอบ</h3>
+          <ul class="list">
+            <li><span>•</span> ชื่อสามัญ ปริมาณยา ข้อความสำคัญ</li>
+            <li><span>•</span> จับคู่กับฐานข้อมูลเพื่อป้องกันอ่านผิด</li>
+          </ul>
+        </article>
+        <article class="card">
+          <h3>รับสรุป</h3>
+          <ul class="list">
+            <li><span>•</span> แสดงผลแบบโครงสร้าง พร้อมปุ่ม Copy/Download JSON</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="about">
+      <h2>เกี่ยวกับโปรเจกต์</h2>
+      <p class="muted"> MediScan ทำหน้าที่ต้อนรับผู้ใช้และอธิบายการใช้งาน ก่อนนำผู้ใช้ไปยังหน้าแอปหลัก (สแกน / ถามด้วยข้อความ)</p>
+    </section>
+  </main>
+
+  <footer class="container">
+    <small>© <span id="year"></span> MediScan</small>
+  </footer>
+
+  <!-- แผง Gate ก่อนเข้าใช้งานจริง (ยืนยันข้อกำหนด) -->
+  <section class="gate" id="gate" hidden>
+    <div class="gate-box" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
+      <div class="gate-head"><strong id="gateTitle">ก่อนเริ่มใช้งาน</strong></div>
+      <div class="gate-body">
+        <p>โปรดอ่านและยอมรับข้อกำหนดเบื้องต้น:</p>
+        <ul class="list">
+          <li><span>•</span> ระบบนี้มีไว้เพื่อการให้ข้อมูลเท่านั้น ไม่ใช่คำแนะนำทางการแพทย์</li>
+          <li><span>•</span> ควรปรึกษาแพทย์/เภสัชกรเมื่อต้องตัดสินใจเรื่องการใช้ยา</li>
+          <li><span>•</span> การอัปโหลดรูปควรปกปิดข้อมูลส่วนบุคคลที่ไม่จำเป็น</li>
+        </ul>
+      </div>
+      <div class="gate-actions">
+        <button class="btn" id="btnLater">ยกเลิก</button>
+        <button class="btn primary" id="btnAccept">ยอมรับและเริ่มใช้งาน</button>
+      </div>
+    </div>
+  </section>
+
+  <script>
+    'use strict';
+    const $ = (s, p=document) => p.querySelector(s);
+
+    // === ปรับค่าหน้านี้ให้เข้ากับโปรเจกต์จริงของคุณ ===
+    // เมื่อผู้ใช้กดเริ่มใช้งาน จะพาไปหน้านี้ (อาจเป็น /app.html หรือ /scan หรือ /ask)
+    const APP_ENTRY = 'second.page.html'; // ← เปลี่ยนเป็นหน้าแอปจริงของคุณ
+
+    function setup(){
+      // ปีปัจจุบัน
+      $('#year').textContent = new Date().getFullYear();
+
+      // ปุ่มเมนูมือถือ (ถ้าอยากทำให้แสดง/ซ่อนเมนู)
+      const toggle = $('#navToggle');
+      const menu = $('#menu');
+      toggle?.addEventListener('click', () => {
+        const show = menu.style.display !== 'flex';
+        menu.style.display = show ? 'flex' : 'none';
+        toggle.setAttribute('aria-expanded', String(show));
+      });
+
+      // ปุ่มเริ่มใช้งาน → แสดง Gate (ยืนยันก่อน)
+      $('#btnStart').addEventListener('click', openGate);
+      $('#btnLater').addEventListener('click', closeGate);
+      $('#btnAccept').addEventListener('click', () => {
+        localStorage.setItem('mediscan.accepted', '1');
+        navigateToApp();
+      });
+
+      // หากเคยยอมรับแล้ว ก็ไปต่อได้เลย (สามารถปิดได้โดยลบ localStorage)
+      if(localStorage.getItem('mediscan.accepted') === '1'){
+        // ไม่แสดง gate อัตโนมัติ แต่กดเริ่มใช้งานจะไปทันที
+      }
+    }
+
+    function openGate(){ $('#gate').hidden = false; }
+    function closeGate(){ $('#gate').hidden = true; }
+
+    function navigateToApp(){
+      // ถ้าคุณต้องการ single-page: เปลี่ยนเป็น window.location.hash = '#app';
+      // หรือ emit event เพื่อนำไปสู่หน้าถัดไป
+      if(APP_ENTRY){ window.location.href = APP_ENTRY; }
+      else { toast('ยังไม่ได้ตั้งค่าเส้นทางแอป'); }
+    }
+
+    function toast(msg){
+      const el = Object.assign(document.createElement('div'), { className:'toast', textContent: msg });
+      el.style.background = 'rgba(14,165,233,.12)';
+      el.style.border = '1px solid rgba(14,165,233,.5)';
+      el.style.color = 'var(--brand)';
+      document.body.append(el);
+      setTimeout(() => el.remove(), 1600);
+    }
+
+    document.addEventListener('DOMContentLoaded', setup);
+  </script>
+</body>
+</html>
