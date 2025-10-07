@@ -1,0 +1,291 @@
+from flask import Flask, request, jsonify, render_template
+from flask_cors import CORS
+import torch
+import torch.nn as nn
+from torchvision import transforms
+from PIL import Image
+import io, base64
+import numpy as np
+import pandas as pd
+import easyocr
+from rapidfuzz import process, fuzz
+import joblib  # สำหรับโหลดโมเดลข้อความ
+
+# ===== โหลดคอนฟิก =====
+from config import (
+    TEMPLATE_FOLDER, STATIC_FOLDER,
+    LEAFLET_PATH, CORS_ORIGINS, EASYOCR_LANGS, EASYOCR_GPU,
+    TEXT_MODEL_PATH, TEXT_SCORE_THRESHOLD,
+    MODEL_PATH  # สำหรับ PyTorch โมเดล .pt
+)
+
+# -------------------------------------------------------------------------------------------------
+# ตั้งค่าแอป
+# -------------------------------------------------------------------------------------------------
+app = Flask(__name__, template_folder="templates", static_folder="static")
+
+# เปิด CORS ให้ทั้ง /predict
+CORS(app, resources={r"/predict": {"origins": CORS_ORIGINS}})
+
+# -------------------------------------------------------------------------------------------------
+# 1) โหลดโมเดล PyTorch (.pt)
+# -------------------------------------------------------------------------------------------------
+# กำหนดโมเดลที่ตรงกับโมเดลที่ฝึกมา (ถ้าจำเป็น)
+class YourModel(nn.Module):
+    def __init__(self):
+        super(YourModel, self).__init__()
+        # ตัวอย่างโครงสร้างโมเดล
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=3)
+        self.fc1 = nn.Linear(64 * 62 * 62, 10)  # ปรับให้เหมาะสมกับโมเดลที่คุณฝึกมา
+
+    def forward(self, x):
+        x = self.conv1(x)
+        x = x.view(-1, 64 * 62 * 62)  # ปรับขนาดให้เหมาะสม
+        x = self.fc1(x)
+        return x
+
+# โหลดโมเดล .pt
+model = YourModel()
+model.load_state_dict(torch.load(MODEL_PATH))  # โหลดโมเดล PyTorch จากไฟล์ .pt
+model.eval()  # ตั้งค่าโมเดลเป็นโหมดการทำนาย
+
+# -------------------------------------------------------------------------------------------------
+# 2) โหลด Leaflet DB (CSV) + เตรียม CANONICAL generic
+# -------------------------------------------------------------------------------------------------
+def _safe_load_list(x):
+    if pd.isna(x) or x == "":
+        return []
+    if isinstance(x, list):
+        return x
+    try:
+        return json.loads(x)
+    except Exception:
+        return [str(x)]
+
+# คอลัมน์ที่คาดว่าเป็น "รายการ" (list) 
+cols = ["generics", "strengths", "indications", "warnings"]
+
+if os.path.exists(LEAFLET_PATH):
+    df = pd.read_csv(LEAFLET_PATH, encoding="utf-8-sig")
+    for col in cols:
+        if col in df.columns:
+            df[col] = df[col].apply(_safe_load_list)
+        else:
+            df[col] = [[] for _ in range(len(df))]
+    LEAFLET_ROWS = df.to_dict(orient="records")
+else:
+    LEAFLET_ROWS = []  # ถ้าไม่มีไฟล์ก็ให้เป็นลิสต์เปล่า
+
+CANONICAL = sorted({
+    (g or "").lower().strip()
+    for row in LEAFLET_ROWS
+    for g in row.get("generics", [])
+    if isinstance(g, str) and g.strip() != ""
+})
+
+# -------------------------------------------------------------------------------------------------
+# 3) เตรียม EasyOCR
+# -------------------------------------------------------------------------------------------------
+ocr_reader = easyocr.Reader(EASYOCR_LANGS, gpu=EASYOCR_GPU)
+
+# -------------------------------------------------------------------------------------------------
+# 4) Utilities (normalize / split / parse strength / fuzzy match)
+# -------------------------------------------------------------------------------------------------
+SPLIT_RX = re.compile(r"\s*(?:\+|\/|,| with )\s*", re.I)
+STRENGTH_RX = re.compile(r'(\d+(?:\.\d+)?)\s?(mg|g|mcg|µg|mL|ml|IU)', re.I)
+
+def normalize_text(t: str):
+    t = (t or "").strip().lower()
+    t = re.sub(rf'[^a-z0-9\u0E00-\u0E7F\s\+\-\/\,\.µgml%]', ' ', t)
+    t = re.sub(r'\s+', ' ', t).strip()
+    return t
+
+def split_generics(t: str):
+    t = normalize_text(t)
+    return [p.strip() for p in SPLIT_RX.split(t) if p.strip()]
+
+def parse_strengths(texts):
+    strengths = set()
+    for t in texts:
+        for m in STRENGTH_RX.finditer(t):
+            val, unit = m.group(1), m.group(2)
+            unit = unit.replace('ml', 'mL')
+            strengths.add(f"{val} {unit}")
+    return sorted(strengths)
+
+def canon_generic_one(word, score_cut=90):
+    if not CANONICAL:
+        return None, 0.0
+    m, score, _ = process.extractOne(
+        word,
+        CANONICAL,
+        scorer=fuzz.token_set_ratio
+    )
+    return (m, score/100.0) if score >= score_cut else (None, 0.0)
+
+def canon_generics_from_texts(texts):
+    found = set()
+    for t in texts:
+        for w in split_generics(t):
+            g, sc = canon_generic_one(w)
+            if g:
+                found.add(g)
+    return sorted(found)
+
+def match_leaflet(generics, strengths):
+    candidates = []
+    gset = set(generics)
+    sset = set(strengths)
+    for row in LEAFLET_ROWS:
+        rg = set([x.lower() for x in row.get("generics", [])])
+        rs = set([x for x in row.get("strengths", [])])
+        if rg == gset:
+            if not sset or not rs or (rs & sset):
+                candidates.append(("exact", row))
+    if candidates:
+        return candidates
+
+    subset = []
+    for row in LEAFLET_ROWS:
+        rg = set([x.lower() for x in row.get("generics", [])])
+        if rg.issubset(gset) and len(rg) > 0:
+            subset.append(row)
+
+    if subset:
+        merged = {
+            "product_id": "COMBO-INFERRED",
+            "generics": generics,
+            "strengths": strengths,
+            "indications": sorted({i for r in subset for i in r.get("indications", [])}),
+            "dosage": "ดูตามตัวยาแต่ละชนิด",
+            "warnings": sorted({w for r in subset for w in r.get("warnings", [])}),
+            "note": "สรุปจากหลายตัวยารวมกัน (ไม่พบผลิตภัณฑ์ exact)"
+        }
+        return [("union", merged)]
+    return []
+
+# -------------------------------------------------------------------------------------------------
+# 5) โหลดโมเดลข้อความ (.joblib)
+# -------------------------------------------------------------------------------------------------
+TEXT_CLF = None
+TEXT_CLF_LABELS = []
+TEXT_VECT = None
+
+try:
+    if os.path.exists(TEXT_MODEL_PATH):
+        pack = joblib.load(TEXT_MODEL_PATH)
+        TEXT_CLF = pack.get("model") if isinstance(pack, dict) else getattr(pack, "model", None)
+        TEXT_VECT = pack.get("vectorizer") if isinstance(pack, dict) else getattr(pack, "vectorizer", None)
+        TEXT_CLF_LABELS = (pack.get("labels") if isinstance(pack, dict) else getattr(pack, "labels", [])) or []
+        print(f"[TEXT MODEL] Loaded: {TEXT_MODEL_PATH} (labels={len(TEXT_CLF_LABELS)})")
+except Exception as e:
+    print(f"[TEXT MODEL] Failed to load: {e}")
+
+# -------------------------------------------------------------------------------------------------
+# 6) /predict (รับไฟล์รูป หรือ JSON base64) -> คืนผลตรวจ + รูปวาดกรอบ + ข้อสรุป
+# -------------------------------------------------------------------------------------------------
+@app.route("/predict", methods=["POST","GET"])
+def predict():
+    try:
+        # ---- รับรูป ----
+        if "image" in request.files:
+            file = request.files["image"]
+            img_bytes = file.read()
+            pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+        else:
+            data = request.get_json(force=True, silent=True) or {}
+            b64 = data.get("image_base64", "")
+            if not b64:
+                return jsonify({"error": "No image provided. Send multipart form 'image' or JSON with 'image_base64'."}), 400
+            if b64.startswith("data:"):
+                b64 = b64.split(",", 1)[1]
+            img_bytes = base64.b64decode(b64)
+            pil_img = Image.open(io.BytesIO(img_bytes)).convert("RGB")
+
+        # ---- YOLO Predict ----
+        results = model.predict(source=np.array(pil_img), imgsz=640, conf=0.25, verbose=False)
+        r = results[0]
+
+        boxes   = r.boxes.xyxy.cpu().numpy() if hasattr(r.boxes, "xyxy") else np.array([])
+        scores  = r.boxes.conf.cpu().numpy() if hasattr(r.boxes, "conf") else np.array([])
+        classes = r.boxes.cls.cpu().numpy()  if hasattr(r.boxes, "cls")  else np.array([])
+        names   = model.names if hasattr(model, "names") else {}
+
+        # ---- OCR ต่อกล่อง ----
+        np_bgr = np.array(pil_img)[:, :, ::-1]  # RGB -> BGR
+        ocr_rows = []
+        for b, s, c in zip(boxes, scores, classes):
+            x1, y1, x2, y2 = map(int, b)
+            x1, y1 = max(0, x1), max(0, y1)
+            x2, y2 = min(np_bgr.shape[1], x2), min(np_bgr.shape[0], y2)
+            crop_bgr = np_bgr[y1:y2, x1:x2].copy()
+            texts = ocr_text_from_np(crop_bgr)
+            ocr_rows.append({
+                "class_id": int(c),
+                "class_name": names.get(int(c), str(int(c))),
+                "conf": float(s),
+                "box": [float(b[0]), float(b[1]), float(b[2]), float(b[3])],
+                "ocr_texts": texts
+            })
+
+        # ---- รวมข้อความทั้งหมด -> infer generics & strengths ----
+        all_texts = [t for row in ocr_rows for t in row["ocr_texts"]]
+        inferred_generics  = canon_generics_from_texts(all_texts)
+        inferred_strengths = parse_strengths(all_texts)
+
+        # ---- จับคู่กับ Leaflet DB ----
+        matches = match_leaflet(inferred_generics, inferred_strengths)
+
+        # ---- วาดกรอบ + สรุปท้ายภาพ ----
+        pil_with_boxes = draw_boxes_pil(pil_img, boxes, scores, classes, names)
+
+        summary_lines = []
+        if inferred_generics:
+            summary_lines.append("Generics: " + ", ".join(inferred_generics))
+        if inferred_strengths:
+            summary_lines.append("Strengths: " + ", ".join(inferred_strengths))
+        if matches:
+            kind, row0 = matches[0]
+            inds = row0.get("indications", [])
+            if inds:
+                summary_lines.append("Indications: " + ", ".join(inds[:5]))
+
+        if summary_lines:
+            import PIL.ImageDraw as ImageDraw, PIL.ImageFont as ImageFont
+            draw = ImageDraw.Draw(pil_with_boxes)
+            W, H = pil_with_boxes.size
+            pad = 10
+            block = "\n".join(summary_lines)
+
+            # วัดความสูงคร่าว ๆ
+            h_block = 90
+            draw.rectangle([(0, H - h_block), (W, H)], fill=(0, 0, 0, 160))
+            draw.text((pad, H - h_block + 12), block, fill=(255, 255, 255))
+
+        # ---- เข้ารหัสภาพ base64 ----
+        buffered = io.BytesIO()
+        pil_with_boxes.save(buffered, format="PNG")
+        img_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+        data_url = f"data:image/png;base64,{img_b64}"
+
+        # ---- ตอบกลับ
+        return jsonify({
+            "detected": ocr_rows,
+            "inferred": {
+                "generics": inferred_generics,
+                "strengths": inferred_strengths
+            },
+            "matched_products": [
+                {"match_type": how, "item": row} for (how, row) in matches
+            ],
+            "image_base64": data_url
+        })
+
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+# -------------------------------------------------------------------------------------------------
+# 8) Run
+# -------------------------------------------------------------------------------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=6000, debug=True)

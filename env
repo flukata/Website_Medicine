@@ -1,0 +1,4 @@
+# ปล. แก้โดเมนตามของจริง
+CORS_ORIGINS= https://g5weds.consolutechcloud.com
+EASYOCR_LANGS=th,en
+EASYOCR_GPU=false
