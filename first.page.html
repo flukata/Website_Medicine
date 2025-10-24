@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MediScan • หน้าหลัก</title>
+  <title>MediScan • Home</title>
   <meta name="description" content="หน้าแรกก่อนเข้าใช้งาน MediScan – สแกนฉลากยาและถามตอบข้อมูลยา" />
   <meta name="theme-color" content="#0ea5e9" />
 
@@ -79,15 +79,15 @@
   </style>
 </head>
 <body>
-  <a class="skip-link" href="#main">ข้ามไปยังเนื้อหา</a>
+  <!-- <a class="skip-link" href="#main">ข้ามไปยังเนื้อหา</a> -->
 
   <header class="container">
     <nav class="nav">
       <div class="logo">
         <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden="true"><path d="M21 21l-4.35-4.35" stroke="#0ea5e9" stroke-width="2" stroke-linecap="round"/><circle cx="11" cy="11" r="7" stroke="#0ea5e9" stroke-width="2" fill="none"/></svg>
-        MediScan <span class="badge">beta</span>
+        MediScan
       </div>
-      <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="menu">เมนู</button>
+      <button class="nav-toggle" id="navToggle" aria-expanded="false" aria-controls="menu">=</button>
       <ul id="menu" class="menu" role="menubar">
         <li role="none"><a role="menuitem" href="#features">จุดเด่น</a></li>
         <li role="none"><a role="menuitem" href="#how">วิธีใช้งาน</a></li>
@@ -97,7 +97,7 @@
 
     <section class="hero" id="hero">
       <h1>แพลตฟอร์มช่วยอ่านและทำความเข้าใจฉลากยา</h1>
-      <p class="muted">สแกนฉลากยา (จากรูปภาพ) หรือถามคำถามเกี่ยวกับยา แล้วรับสรุปข้อมูลที่อ่านง่ายขึ้น เช่น ชื่อสามัญ ปริมาณรับประทาน ข้อควรระวัง และคำเตือนที่สำคัญ</p>
+      <p class="muted">สแกนฉลากยา (จากรูปภาพ) หรือถามคำถามเกี่ยวกับยา แล้วรับข้อมูลที่อ่านง่ายขึ้น เช่น ชื่อสามัญ ปริมาณรับประทาน ข้อควรระวัง และคำเตือนที่สำคัญ</p>
       <div class="cta">
         <a class="btn primary" id="btnStart">เริ่มใช้งาน</a>
       </div>
@@ -114,11 +114,11 @@
         </article>
         <article class="card">
           <h3>ถามด้วยข้อความ</h3>
-          <p class="muted">พิมพ์คำถามเกี่ยวกับยา เช่น “รับประทานได้บ่อยแค่ไหน” แล้วดูคำตอบสรุป</p>
+          <p class="muted">พิมพ์คำถามเกี่ยวกับยา เช่น “Paracetamol” แล้วดูผลลัพธ์</p>
         </article>
         <article class="card">
           <h3>สรุปผลลัพธ์เข้าใจง่าย</h3>
-          <p class="muted">นำเสนอแบบหัวข้อสำคัญ</p>
+          <p class="muted">นำเสนอเฉพาะหัวข้อมูลสำคัญเกี่ยวข้องกับยาสามัญ</p>
         </article>
       </div>
     </section>
@@ -129,21 +129,21 @@
         <article class="card">
           <h3>อัปโหลดภาพฉลาก</h3>
           <ul class="list">
-            <li><span>•</span> รองรับไฟล์ JPG/PNG</li>
-            <li><span>•</span> ถ่ายให้คมชัดและไม่เอียง</li>
+            <li><span>•</span> รองรับไฟล์ JPG/PNG </li>
+            <li><span>•</span> รูปถ่ายต้องมีความคมชัดพร้อมชื่อยาสามัญ</li>
           </ul>
         </article>
         <article class="card">
-          <h3>ประมวลผลด้วย OCR + ตรวจสอบ</h3>
+          <h3>ประมวลผลด้วย Generics </h3>
           <ul class="list">
             <li><span>•</span> ชื่อสามัญ ปริมาณยา ข้อความสำคัญ</li>
             <li><span>•</span> จับคู่กับฐานข้อมูลเพื่อป้องกันอ่านผิด</li>
           </ul>
         </article>
         <article class="card">
-          <h3>รับสรุป</h3>
+          <h3>ผลลัพธ์</h3>
           <ul class="list">
-            <li><span>•</span> แสดงผลแบบโครงสร้าง พร้อมปุ่ม Copy/Download JSON</li>
+            <li><span>•</span> เป็นหัวข้อความรู้เกี่ยวกับยาตัวนั้น </li>
           </ul>
         </article>
       </div>
@@ -151,7 +151,7 @@
 
     <section id="about">
       <h2>เกี่ยวกับโปรเจกต์</h2>
-      <p class="muted"> MediScan ทำหน้าที่ต้อนรับผู้ใช้และอธิบายการใช้งาน ก่อนนำผู้ใช้ไปยังหน้าแอปหลัก (สแกน / ถามด้วยข้อความ)</p>
+      <p class="muted"> MediScan เป็นโมเดล AI ที่ใช้ในการให้ความรู้ ความเข้าใจเกี่ยวกับการใช้ยาสามัญ เพื่อให้เหมาะสมกับบุคคลพร้อมทั้งแนะนำวิธีการใช้ยาที่ถูกต้อง </p>
     </section>
   </main>
 
@@ -162,7 +162,7 @@
   <!-- แผง Gate ก่อนเข้าใช้งานจริง (ยืนยันข้อกำหนด) -->
   <section class="gate" id="gate" hidden>
     <div class="gate-box" role="dialog" aria-modal="true" aria-labelledby="gateTitle">
-      <div class="gate-head"><strong id="gateTitle">ก่อนเริ่มใช้งาน</strong></div>
+      <div class="gate-head"><strong id="gateTitle">คำแนะนำ</strong></div>
       <div class="gate-body">
         <p>โปรดอ่านและยอมรับข้อกำหนดเบื้องต้น:</p>
         <ul class="list">
@@ -173,7 +173,7 @@
       </div>
       <div class="gate-actions">
         <button class="btn" id="btnLater">ยกเลิก</button>
-        <button class="btn primary" id="btnAccept">ยอมรับและเริ่มใช้งาน</button>
+        <button class="btn primary" id="btnAccept">ยอมรับ</button>
       </div>
     </div>
   </section>
@@ -181,13 +181,10 @@
   <script>
     'use strict';
     const $ = (s, p=document) => p.querySelector(s);
-
-    // === ปรับค่าหน้านี้ให้เข้ากับโปรเจกต์จริงของคุณ ===
-    // เมื่อผู้ใช้กดเริ่มใช้งาน จะพาไปหน้านี้ (อาจเป็น /app.html หรือ /scan หรือ /ask)
-    const APP_ENTRY = 'second.page.html'; // ← เปลี่ยนเป็นหน้าแอปจริงของคุณ
+    //const APP_ENTRY = 'second.page.html'; //เปลี่ยนเป็นหน้า
+    const APP_ENTRY = 'second.html'; //เปลี่ยนเป็นหน้า
 
     function setup(){
-      // ปีปัจจุบัน
       $('#year').textContent = new Date().getFullYear();
 
       // ปุ่มเมนูมือถือ (ถ้าอยากทำให้แสดง/ซ่อนเมนู)
@@ -217,9 +214,8 @@
     function closeGate(){ $('#gate').hidden = true; }
 
     function navigateToApp(){
-      // ถ้าคุณต้องการ single-page: เปลี่ยนเป็น window.location.hash = '#app';
-      // หรือ emit event เพื่อนำไปสู่หน้าถัดไป
       if(APP_ENTRY){ window.location.href = APP_ENTRY; }
+      // if(APP_ENTRY){ window.location.hash = 'second.page.html'; }
       else { toast('ยังไม่ได้ตั้งค่าเส้นทางแอป'); }
     }
 
