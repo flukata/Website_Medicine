@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>MediScan • ใช้งาน</title>
+  <title>MediScan • system-ui</title>
   <meta name="description" content="หน้าใช้งาน MediScan: ป้อนคำถามด้วยข้อความหรืออัปโหลดรูป PNG/JPG แล้วแสดงผลเป็นข้อความ" />
   <meta name="theme-color" content="#0ea5e9" />
   <style>
@@ -44,18 +44,25 @@
 
     .status{ min-height:1.2rem; color:var(--muted) }
 
-    /* ผลลัพธ์แบบข้อความเท่านั้น */
+    /* ผลลัพธ์ */
     #result[hidden]{ display:none }
     #result{ margin-top:1rem }
     .result-wrap{ background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.1); border-radius: var(--radius); box-shadow: var(--shadow); overflow:hidden }
     .result-head{ display:flex; align-items:center; justify-content:space-between; gap:.5rem; padding: .9rem 1rem; background: rgba(14,165,233,.08); border-bottom:1px solid rgba(14,165,233,.25) }
     .result-body{ padding: 1rem }
     .result-text{ white-space: pre-wrap; line-height: 1.75 }
+    .result-img{ margin-top:.75rem; max-width:100%; border-radius: 12px; border:1px solid rgba(255,255,255,.1) }
 
-    /* โหลด */
-    .loading{ display:inline-flex; align-items:center; gap:.6rem }
-    .spinner{ width:18px; height:18px; border:3px solid rgba(255,255,255,.25); border-top-color: var(--brand); border-radius:50%; animation:spin 1s linear infinite }
-    @keyframes spin{ to { transform: rotate(360deg) } }
+    /* Badge แสดง Top-1 */
+    .badge{
+      display:inline-block;
+      padding:.25rem .5rem;
+      border:1px solid rgba(255,255,255,.2);
+      border-radius:999px;
+      font-size:.9rem;
+      background:rgba(255,255,255,.06);
+      color:var(--text);
+    }
   </style>
 </head>
 <body>
@@ -73,7 +80,7 @@
 
   <main class="container" id="main" tabindex="-1">
     <h1>ใช้งานระบบ</h1>
-    <p class="muted">ป้อนคำถามด้วยข้อความหรืออัปโหลดรูปภาพ (PNG/JPG) จากนั้นกด "ประมวลผล" — ผลลัพธ์จะแสดงเป็น<strong>ข้อมูลยา</strong></p>
+    <p class="muted">อัปโหลดรูปฉลากยา (PNG/JPG) แล้วกด “ประมวลผล” — ระบบจะอ่าน <strong>Generics / Strengths</strong> และจับคู่ฐานข้อมูล</p>
 
     <section class="grid" aria-label="อินพุต">
       <!-- ช่องอัปโหลดรูป -->
@@ -83,18 +90,18 @@
           <p class="muted">วางไฟล์ที่นี่ หรือ</p>
           <div class="row">
             <input id="file" type="file" accept="image/png,image/jpeg" aria-label="เลือกไฟล์รูป PNG หรือ JPG" />
-            <button class="btn" id="clearFile" type="button">ล้างไฟล์</button>
+            <button class="btn" id="clearFile" type="button">ลบไฟล์</button>
           </div>
           <p class="hint" id="fileHint">ยังไม่ได้เลือกไฟล์</p>
         </div>
       </article>
 
-      <!-- ช่องข้อความ -->
+      <!-- ช่องข้อความ (optional) -->
       <article class="card">
-        <h2>คำถามเกี่ยวกับยา</h2>
-        <textarea id="question" placeholder="เช่น: paracetamol รับประทานได้บ่อยแค่ไหน? หรือพิมพ์ข้อความบนฉลากที่อ่านได้"></textarea>
+        <h2>ข้อความเพิ่มเติม (ตัวเลือก)</h2>
+        <textarea id="question" placeholder="เช่น คำถามเกี่ยวกับยาหรือโน้ตสั้น ๆ (ไม่จำเป็น)"></textarea>
         <div class="row" style="margin-top:.6rem">
-          <button class="btn" id="clearText" type="button">ล้างข้อความ</button>
+          <button class="btn" id="clearText" type="button">ลบข้อความ</button>
         </div>
       </article>
     </section>
@@ -107,157 +114,327 @@
       <p id="status" class="status" role="status" aria-live="polite"></p>
     </section>
 
-    <!-- โซนผลลัพธ์ (ข้อความเท่านั้น) -->
+    <!-- โซนผลลัพธ์ -->
     <section id="result" aria-live="polite" aria-busy="false" hidden>
       <div class="result-wrap">
         <div class="result-head">
-          <strong>ผลลัพธ์</strong>
+          <div class="row" style="align-items:center; gap:.6rem">
+            <strong>ผลลัพธ์การตรวจจับ</strong>
+            <span id="topClass" class="badge" aria-live="polite"></span>
+          </div>
           <div class="row">
             <button class="btn" id="copyText" type="button">คัดลอกข้อความ</button>
           </div>
         </div>
         <div class="result-body">
           <div id="resultText" class="result-text"></div>
+          <img id="resultImage" class="result-img" alt="ผลลัพธ์พร้อมกรอบ" />
         </div>
       </div>
     </section>
   </main>
 
-  <script>
-    'use strict';
-    const $ = (s, p=document) => p.querySelector(s);
+<script>
+  'use strict';
+    const $ = (s, p = document) => p.querySelector(s);
+    // >>>>>> ตั้งค่า URL ของ API (อย่าใส่ / ปิดท้าย) <<<<<<
+    const API_BASE = 'https://tafern.consolutechcloud.com/backend';
 
-    const ACCEPT = ['image/png','image/jpeg'];
+    // Endpoints
+    const PREDICT_URL = `${API_BASE}/predict`;
+    const HEALTH_URL = `${API_BASE}/health`;
+
+    const ACCEPT = ['image/png', 'image/jpeg'];
     const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+    const TOP_N = 5;
 
-    function setBusy(el, busy=true){ el?.setAttribute('aria-busy', String(busy)); }
 
-    function showStatus(msg, kind='info'){
+    function setBusy(el, busy = true) { el?.setAttribute('aria-busy', String(busy)); }
+
+    function showStatus(msg, kind = 'info') {
       const el = $('#status');
-      el.innerHTML = kind === 'loading' ? `<span class="loading"><span class="spinner"></span>${msg}</span>` : msg;
+      if (!el) return;
+      el.textContent = msg;
+      el.style.color = (kind === 'error') ? 'var(--err)' :
+        (kind === 'loading') ? 'var(--muted)' : 'var(--muted)';
     }
 
-    function setResultText(text){
-      const box = $('#result');
-      const out = $('#resultText');
-      out.textContent = text || '';
-      box.hidden = !text;
+    function setResultText(text) {
+      const box = $('#result'); const out = $('#resultText');
+      out.textContent = text || ''; box.hidden = !text;
     }
 
-    // ตรวจไฟล์
-    function validateFile(file){
-      if(!file) return { ok:true };
-      if(!ACCEPT.includes(file.type)) return { ok:false, reason:'รองรับเฉพาะไฟล์ PNG หรือ JPG' };
-      if(file.size > MAX_SIZE) return { ok:false, reason:'ไฟล์ใหญ่เกิน 10MB' };
-      return { ok:true };
+    function validateFile(file) {
+      if (!file) return { ok: false, reason: 'โปรดเลือกไฟล์ภาพ' };
+      if (!ACCEPT.includes(file.type)) return { ok: false, reason: 'รองรับเฉพาะไฟล์ PNG หรือ JPG' };
+      if (file.size > MAX_SIZE) return { ok: false, reason: 'ไฟล์ใหญ่เกิน 10MB' };
+      return { ok: true };
     }
 
-    // อ่านไฟล์เป็น DataURL (ถ้าต้องส่งไป API ให้ใช้ FormData แทน)
-    function readAsDataURL(file){
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve(reader.result);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
+    async function api(url, opts = {}) {
+      const res = await fetch(url, Object.assign({ credentials: 'include' }, opts));
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      const data = ct.includes('application/json') ? await res.json().catch(() => ({})) : { error: await res.text() };
+      if (!res.ok) throw new Error(data.error || `${res.status} ${res.statusText}`);
+      return data;
     }
 
-    async function processInput(){
-      // เก็บค่า
-      const text = $('#question').value.trim();
-      const fileInput = $('#file');
-      const file = fileInput.files?.[0] || null;
-
-      if(!text && !file){
-        showStatus('โปรดป้อนข้อความหรือเลือกรูปอย่างน้อยหนึ่งอย่าง');
-        return;
-      }
-
-      // ตรวจไฟล์
-      const v = validateFile(file);
-      if(!v.ok){ showStatus(v.reason); return; }
-
-      showStatus('กำลังประมวลผล…', 'loading');
-      setBusy($('#result'), true);
-      setResultText('');
-
-      try{
-        // ===== ตัวอย่างจำลองงานประมวลผล =====
-        // แทนที่ส่วนนี้ด้วยการเรียก API จริงของคุณ เช่น:
-        // const fd = new FormData(); fd.append('text', text); if(file) fd.append('image', file);
-        // const res = await fetch('/api/mediscan', { method:'POST', body: fd });
-        // const outText = await res.text(); // ให้ API ส่งกลับเป็นข้อความล้วน
-        // setResultText(outText);
-
-        // เดโม: ถ้าอัปโหลดรูป จะอ่าน dataURL เพื่อจำลองว่าทำ OCR ได้บางอย่าง
-        let imgNote = '';
-        if(file){
-          await readAsDataURL(file); // ไม่ได้ใช้โชว์ แต่สมมุติว่า OCR แล้ว
-          imgNote = `\n[ภาพ]: ตรวจพบรูปประเภท ${file.type === 'image/png' ? 'PNG' : 'JPG'} ขนาด ${(file.size/1024).toFixed(1)} KB`;
-        }
-        const base = text ? `ข้อความของคุณ: \n"${text}"` : 'ไม่มีข้อความ (ใช้รูปอย่างเดียว)';
-        const summary = '\n\nสรุปผล (เดโม): ข้อมูลถูกส่งเข้ากระบวนการตรวจชื่อสามัญยา/ขนาดยา/คำเตือน แล้วจัดเรียงเป็นคำอธิบายที่อ่านง่าย';
-
-        const out = `${base}${imgNote}${summary}`;
-        setResultText(out);
-        showStatus('เสร็จสิ้น ✔');
-      }catch(err){
-        console.error(err);
-        showStatus('เกิดข้อผิดพลาดในการประมวลผล');
-        setResultText(`เกิดข้อผิดพลาด: ${String(err?.message||err)}`);
-      }finally{
-        setBusy($('#result'), false);
-      }
-    }
-
-    function setupDrop(){
+    // ---------------------- DRAG & DROP ----------------------
+    function setupDrop() {
       const dz = $('#drop');
       const fi = $('#file');
       const hint = $('#fileHint');
+      if (!dz || !fi) return;
 
-      ['dragenter','dragover'].forEach(ev=>{
-        dz.addEventListener(ev, e=>{ e.preventDefault(); dz.classList.add('drag'); });
+      ['dragenter', 'dragover'].forEach(ev => {
+        dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.add('drag'); });
       });
-      ;['dragleave','drop'].forEach(ev=>{
-        dz.addEventListener(ev, e=>{ e.preventDefault(); dz.classList.remove('drag'); });
+
+      ['dragleave', 'drop'].forEach(ev => {
+        dz.addEventListener(ev, e => { e.preventDefault(); dz.classList.remove('drag'); });
       });
+
       dz.addEventListener('drop', e => {
         const f = e.dataTransfer.files?.[0];
-        if(f){
+        if (f) {
           const v = validateFile(f);
-          if(!v.ok){ showStatus(v.reason); return; }
+          if (!v.ok) { showStatus(v.reason, 'error'); return; }
           const dt = new DataTransfer(); dt.items.add(f); fi.files = dt.files;
-          hint.textContent = `เลือกไฟล์: ${f.name}`;
+          if (hint) hint.textContent = `เลือกไฟล์: ${f.name}`;
         }
       });
-      fi.addEventListener('change', ()=>{
+
+      fi.addEventListener('change', () => {
         const f = fi.files?.[0];
-        hint.textContent = f ? `เลือกไฟล์: ${f.name}` : 'ยังไม่ได้เลือกไฟล์';
+        if (hint) hint.textContent = f ? `เลือกไฟล์: ${f.name}` : 'ยังไม่ได้เลือกไฟล์';
       });
-      $('#clearFile').addEventListener('click', ()=>{ fi.value=''; hint.textContent='ยังไม่ได้เลือกไฟล์'; });
+
+      $('#clearFile')?.addEventListener('click', () => {
+        fi.value = ''; if (hint) hint.textContent = 'ยังไม่ได้เลือกไฟล์';
+      });
     }
 
-    function setup(){
-      $('#btnProcess').addEventListener('click', processInput);
-      $('#btnReset').addEventListener('click', ()=>{
-        $('#question').value = '';
-        $('#file').value = '';
-        $('#fileHint').textContent = 'ยังไม่ได้เลือกไฟล์';
-        setResultText('');
-        showStatus('');
-      });
-      $('#clearText').addEventListener('click', ()=>{ $('#question').value = ''; });
-      $('#copyText').addEventListener('click', async ()=>{
-        try{
-          await navigator.clipboard.writeText($('#resultText').textContent || '');
-          showStatus('คัดลอกผลลัพธ์แล้ว');
-        }catch{ showStatus('คัดลอกไม่สำเร็จ'); }
+    // ---------------------- SETUP ----------------------
+    function setup() {
+      // ปุ่มทำงานหลัก
+      $('#btnProcess')?.addEventListener('click', processInput);
+      $('#btnReset')?.addEventListener('click', () => {
+        const fi = $('#file'); const hint = $('#fileHint'); const txt = $('#question');
+        fi && (fi.value = ''); hint && (hint.textContent = 'ยังไม่ได้เลือกไฟล์');
+        txt && (txt.value = ''); setResultText(''); showStatus('');
+        $('#resultImage')?.removeAttribute('src');
+        $('#topClass') && ($('#topClass').textContent = '');
       });
 
+      $('#clearText')?.addEventListener('click', () => { const t = $('#question'); if (t) t.value = ''; });
+      $('#copyText')?.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText($('#resultText')?.textContent || '');
+          showStatus('คัดลอกผลลัพธ์แล้ว');
+        } catch {
+          showStatus('คัดลอกไม่สำเร็จ', 'error');
+        }
+      });
+
+      // ลาก-วาง (ถ้าเพจนี้มีโดม)
       setupDrop();
+
+      // เฮลธ์เช็ค (optional)
+      api(HEALTH_URL, { method: 'GET' })
+        .then(() => showStatus('พร้อมใช้งาน'))
+        .catch(() => { });
     }
 
     document.addEventListener('DOMContentLoaded', setup);
-  </script>
+
+  // ===== helper: ตรวจ normalized และฟอร์แมตข้อความ =====
+  const asNum = v => (typeof v === 'number' ? v : Number(v));
+  function isNormalizedXYXY(dets) {
+    if (!Array.isArray(dets) || dets.length === 0) return false;
+    // อนุโลมค่าเกิน 1 ได้เล็กน้อย (<=1.5) เผื่อโมเดลขยับนิดหน่อย
+    return dets.every(d => Array.isArray(d.xyxy) && Math.max(...d.xyxy.map(asNum)) <= 1.2);
+  }
+  function formatDetectionsText(data, imgW, imgH, detsOverride = null) {
+    if (!data?.had_image) return '';
+    const dets = Array.isArray(detsOverride) ? detsOverride
+                : (Array.isArray(data?.detections) ? data.detections : []);
+    const normalized = isNormalizedXYXY(dets);
+    const lines = [];
+
+    
+    lines.push('** Image Detection **');
+    //lines.push(`ok=${data?.ok}, had_image=${data?.had_image}, had_text=${data?.had_text}`);
+    lines.push(`Detections: ${dets.length}`);
+
+    dets.forEach((d, i) => {
+      const cofi = (typeof d.cofi === 'number' ? d.cofi : (d.confidence ?? 0));
+      const pct = (cofi * 100).toFixed(1) + '%';
+      const xyxy = (d.xyxy || []).map(asNum);
+      const xyxyNormStr = `[${xyxy.map(v => v.toFixed(4)).join(', ')}]`;
+      let pxStr = '';
+      if (normalized && imgW && imgH) {
+        const px = [xyxy[0]*imgW, xyxy[1]*imgH, xyxy[2]*imgW, xyxy[3]*imgH].map(v => Math.round(v));
+        pxStr = `  (px: [${px.join(', ')}])`;
+      }
+
+      const cname = (d.class_name ?? '').toString().trim();
+      const label = cname ? `[${d.class_id}] ${cname}` : `[${d.class_id}]`;
+      lines.push(`Rank ${i+1} Picture ${label}  cofi= ${pct}  xyxy=${xyxyNormStr}${pxStr}`);
+      // lines.push(`Rank ${i+1} ${label}  cofi=${pct}  xyxy=${xyxyNormStr}${pxStr}`);
+    });
+    
+    // if (Array.isArray(data?.obb_boxes) && data.obb_boxes.length) {
+    //     const ex = (data.obb_boxes[0] || []).map(asNum).join(', ');
+    //     lines.push(`obb_boxes[0]: [${ex}]`);
+    //   }
+    return lines.join('\n');
+  }
+
+  function formatTextResultText(textResult) {
+    if (!textResult || typeof textResult !== 'object') return '';
+    if (textResult.error) return `** Text Analysis **\nError: ${textResult.error}`;
+
+    const q = (textResult.query ?? '').toString();
+    const best = textResult.best || {};
+    const fullTop = Array.isArray(textResult.top) ? textResult.top : [];
+    const top = fullTop.slice(0, 3);
+    const toPct = s => (typeof s === 'number' ? (s * 100).toFixed(1) + '%' : '');
+    
+    const lines = [];
+    lines.push('** Text Analysis **');
+    if (q) lines.push(`query: "${q}"`);
+    if (best?.label != null) lines.push(`top 1: ${best.label} (${toPct(best.score)})`);
+    if (top.length) {
+      lines.push(`top ${top.length}:`);
+      top.forEach((t, i) => {
+        lines.push(`  #${i+1} ${t.label} (${toPct(t.score)})`);
+      });
+    }
+
+  // ⬇️ แสดงรายละเอียดเฉพาะของ Top-1 (ถ้ามี)
+  const det = textResult.details;
+  if (det && det.fields) {
+    const f = det.fields;
+    const hasAny =
+      (f.generics && String(f.generics).trim()) ||
+      (f.strength && String(f.strength).trim()) ||
+      (f.indications && String(f.indications).trim()) ||
+      (f.instructions && String(f.instructions).trim()) ||
+      (f.warnings && String(f.warnings).trim());
+
+    if (hasAny) {
+      lines.push('\nDetails (Top 1)');
+      if (f.generics)     lines.push(`Generic: ${f.generics}`);
+      if (f.strength)     lines.push(`Strength: ${f.strength}`);
+      if (f.indications)  lines.push(`Indications: ${f.indications}`);
+      if (f.instructions) lines.push(`Instructions: ${f.instructions}`);
+      if (f.warnings)     lines.push(`Warnings: ${f.warnings}`);
+    }
+  }
+
+  return lines.join('\n');
+}   
+
+  // ===== แก้เฉพาะส่วนหลัก: processInput ให้ตรงกับ backend =====
+  async function processInput() {
+    const file = $('#file')?.files?.[0] || null;
+    const text = ($('#question')?.value || '').trim();
+    const img = $('#resultImage');
+
+    if (!file && !text) { showStatus('โปรดเลือกไฟล์หรือกรอกข้อความอย่างน้อยหนึ่งอย่าง', 'error'); return; }
+    if (file) { const v = validateFile(file); if (!v.ok) { showStatus(v.reason, 'error'); return; } }
+
+    showStatus('กำลังประมวลผล…'); setResultText(''); img?.removeAttribute('src');
+    $('#topClass') && ($('#topClass').textContent = '');
+    $('#topText') && ($('#topText').textContent = '');
+
+    try {
+      const fd = new FormData();
+      if (file) fd.append('image', file);
+      if (text) fd.append('text', text);
+
+      const data = await api(PREDICT_URL, { method: 'POST', body: fd });
+
+      // --- รูปผลลัพธ์จาก backend (image_base64) ---
+      if (data?.image_base64 && img) {
+        img.src = data.image_base64;
+      } else {
+        img?.removeAttribute('src');
+      }
+
+       // --- จัดการแบบ "ไม่ซ้ำคลาส" : เก็บกล่องที่คอนฟิเดนซ์สูงสุดต่อคลาส ---
+       const detsAll = Array.isArray(data?.detections) ? data.detections : [];
+       const withConf = detsAll.map(d => ({
+         ...d,
+         _cofi: (typeof d.cofi === 'number' ? d.cofi : (d.confidence ?? 0))
+       }));
+       const bestByClass = {};
+       for (const d of withConf) {
+         const key = (d.class_id ?? d.class_name ?? '').toString();
+         if (!bestByClass[key] || d._cofi > bestByClass[key]._cofi) {
+           bestByClass[key] = d; // เก็บเฉพาะที่ conf สูงสุดในคลาสนั้น
+        }
+       }      
+       const dets = Object.values(bestByClass)
+        .sort((a, b) => b._cofi - a._cofi)
+        .slice(0, TOP_N);
+
+      if (dets.length > 0) {
+        const top = dets[0];
+        const cofi = (typeof top.cofi === 'number' ? top.cofi : (top.confidence ?? 0));
+        const pct = (cofi * 100).toFixed(1) + '%';
+        const cname = (top.class_name ?? '').toString().trim();
+        const label = cname ? `[${top.class_id}] ${cname}` : `[${top.class_id}]`;
+        const topText = `Top-1: ${label} (${pct})`;
+        const topEl = $('#topClass'); if (topEl) topEl.textContent = topText;
+      } else {
+        const topEl = $('#topClass'); if (topEl) topEl.textContent = '';
+      }
+
+      // --- สร้างข้อความสรุปผล (รองรับ normalized ➜ px) ---
+      const renderDetections = () => {
+        const W = img?.naturalWidth || null;
+        const H = img?.naturalHeight || null;
+        return formatDetectionsText(data, W, H, dets);
+      };
+
+      const textResultStr = formatTextResultText(data?.text_result);
+
+      const updateResultBox = () => {
+        const detStr = renderDetections();
+        const combined = [detStr, textResultStr].filter(Boolean).join('\n\n');
+        setResultText(combined || 'ไม่มีผลลัพธ์');
+      };
+
+      // ถ้ามีรูป ก็รอให้โหลดครบก่อนจะคำนวณ px; ถ้าไม่มีรูป ก็อัปเดตรายงานเลย
+      if (img && data?.image_base64) {
+        if (img.complete) updateResultBox();
+        else {
+          img.onload = updateResultBox;
+          img.onerror = () => {
+            const detStr = formatDetectionsText(data, null, null, dets);
+            const combined = [detStr, textResultStr].filter(Boolean).join('\n\n');
+            setResultText(combined || 'ไม่มีผลลัพธ์');
+          };
+        }
+      } else {
+        updateResultBox();
+      }
+
+    // ✅ NEW: ถ้ามี element #topText ให้โชว์ top-1 จากฝั่งข้อความ
+    if (data?.had_text && data?.text_result && !data.text_result.error) {
+      const best = data.text_result.best;
+      if (best && $('#topText')) {
+        const pct = (typeof best.score === 'number') ? (best.score * 100).toFixed(1) + '%' : '';
+        $('#topText').textContent = `Top-1 (text): ${best.label}${pct ? ' (' + pct + ')' : ''}`;
+      }
+    }
+
+      showStatus('เสร็จสิ้น ✔');
+    } catch (e) {
+      showStatus('เกิดข้อผิดพลาด: ' + String(e.message || e), 'error');
+    }
+  }
+</script>
 </body>
 </html>
